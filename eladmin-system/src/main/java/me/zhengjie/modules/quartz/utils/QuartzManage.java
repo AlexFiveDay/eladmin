@@ -1,3 +1,18 @@
+/*
+ *  Copyright 2019-2025 Zheng Jie
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
 package me.zhengjie.modules.quartz.utils;
 
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +35,7 @@ public class QuartzManage {
 
     private static final String JOB_NAME = "TASK_";
 
-    @Resource(name = "scheduler")
+    @Resource
     private Scheduler scheduler;
 
     public void addJob(QuartzJob quartzJob){
@@ -41,8 +56,12 @@ public class QuartzManage {
             //重置启动时间
             ((CronTriggerImpl)cronTrigger).setStartTime(new Date());
 
-            //执行定时任务
-            scheduler.scheduleJob(jobDetail,cronTrigger);
+            //执行定时任务，如果是持久化的，这里会报错，捕获输出
+            try {
+                scheduler.scheduleJob(jobDetail,cronTrigger);
+            } catch (ObjectAlreadyExistsException e) {
+                log.warn("定时任务已存在，跳过加载");
+            }
 
             // 暂停任务
             if (quartzJob.getIsPause()) {
@@ -109,8 +128,9 @@ public class QuartzManage {
             TriggerKey triggerKey = TriggerKey.triggerKey(JOB_NAME + quartzJob.getId());
             CronTrigger trigger = (CronTrigger) scheduler.getTrigger(triggerKey);
             // 如果不存在则创建一个定时任务
-            if(trigger == null)
+            if(trigger == null) {
                 addJob(quartzJob);
+            }
             JobKey jobKey = JobKey.jobKey(JOB_NAME + quartzJob.getId());
             scheduler.resumeJob(jobKey);
         } catch (Exception e){
@@ -123,13 +143,14 @@ public class QuartzManage {
      * 立即执行job
      * @param quartzJob /
      */
-    public void runAJobNow(QuartzJob quartzJob){
+    public void runJobNow(QuartzJob quartzJob){
         try {
             TriggerKey triggerKey = TriggerKey.triggerKey(JOB_NAME + quartzJob.getId());
             CronTrigger trigger = (CronTrigger) scheduler.getTrigger(triggerKey);
             // 如果不存在则创建一个定时任务
-            if(trigger == null)
+            if(trigger == null) {
                 addJob(quartzJob);
+            }
             JobDataMap dataMap = new JobDataMap();
             dataMap.put(QuartzJob.JOB_KEY, quartzJob);
             JobKey jobKey = JobKey.jobKey(JOB_NAME + quartzJob.getId());
